@@ -43,6 +43,8 @@ See the code on <a href="https://github.com/ecc521/background-remover" target="b
 		    <p>Note: Browsers may block some images from being loaded due to CORS security.</p>
 		</div>
 
+		<br><br>
+
 		<div id="previews"></div>
 		<div id="processed"></div>
 
@@ -396,8 +398,10 @@ function process() {
 		</script>
 
 		<style>
-		body {
+		html, body {
 		    margin:0;
+			background: linear-gradient(to right, #00000033, #ffa50033 , #FFFF0033, #00800033, #00ffff33, #0000FF33, #ee82ee33);
+			min-height: 100vh;
 		}
 
 		#fileurl {
@@ -475,19 +479,19 @@ function process() {
 		}
 
 		#previews *, #processed * {
-			max-width: 50vw;
+			max-width: 49vw;
 		}
 
 		#previews {
 			display: inline-block;
 			float: left;
-			max-width: 50vw;
+			max-width: 49vw;
 		}
 
 		#processed {
 			display: inline-block;
 			float: right;
-			max-width: 50vw;
+			max-width: 49vw;
 		}
 
 		input {

@@ -1,4 +1,4 @@
-https://ecc521.github.io/background-remover/index.html
+https://ecc521.github.io/background-remover/
 
 # background-remover
 Remove a mostly solid background until reaching a border. 

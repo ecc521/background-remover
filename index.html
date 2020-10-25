@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html>
+	<head>
+	</head>
+	<body>
+
+		<script src="index.js"></script>
+		<input id="backgroundR" placeholder="Red value of background color (0-255)">
+		<input id="backgroundG" placeholder="Green value of background color (0-255)">
+		<input id="backgroundB" placeholder="Blue value of background color (0-255)">
+		<input id="maxContrast" placeholder="Max color contrast for background. (1-22)">
+		<button id="process" onclick="process()">Process Images</button>
+
+<br>
+
+		<div id="inputselector">
+		    <button class="selected" id="computer">From your Computer</button>
+		    <button id="url">By URL</button>
+		</div>
+
+		<div id="filedrop">
+		    <p>Drag Images here, paste, OR</p>
+		    <input type="file" id="fileinput" multiple accept="image/*">
+		    <label id="fileinputlabel" for="fileinput">Browse for Images</label>
+		</div>
+
+		<div id="urlselector">
+		    <p>Select images by URL</p>
+		    <input type="text" value="" placeholder="URL Goes Here. Remeber http:// or https://" id="fileurl">
+		    <button id="submiturl" disabled>Add Image</button>
+		    <img id="urlpreview" crossorigin="anonymous">
+		    <p>Note: Browsers may block some images from being loaded due to CORS security.</p>
+		</div>
+
+		<div id="previews"></div>
+		<div id="processed"></div>
+
+		<script>
+
+
+let previews = GetId("previews")
+let processed = GetId("processed")
+function addCanvas(canvas) {
+	//This will be the canvas we are editing.
+	previews.appendChild(canvas)
+}
+
+function process() {
+	//Default to top left pixel of image if none speficied.
+
+	while(processed.firstChild) {
+		if (processed.firstChild.src) {
+			//If we use images, not canvases.
+			window.revokeObjectURL(processed.firstChild.src)
+		}
+		processed.firstChild.remove()
+	}
+
+	for (let i=0;i<previews.children.length;i++) {
+		let sourceCanvas = previews.children[i]
+
+		//Clone sourceCanvas
+		let canvas = document.createElement("canvas")
+		canvas.width = sourceCanvas.width
+		canvas.height = sourceCanvas.height
+		let ctx = canvas.getContext("2d")
+		ctx.drawImage(sourceCanvas, 0, 0)
+		let imageData = ctx.getImageData(0,0,canvas.width,canvas.height)
+		let pixelData = imageData.data
+		window.pixelData = pixelData
+
+		let processingArray = new Uint8Array(canvas.width * canvas.height)
+		window.processingArray = processingArray
+
+		let targetR = GetId("backgroundR").value || 255 //White default
+		let targetG = GetId("backgroundG").value || 255
+		let targetB = GetId("backgroundB").value || 255
+		let targetArr = [targetR, targetG, targetB]
+		let maxContrast = GetId("maxContrast").value || 1.5 //We'll expirament to see what to put here. Not sure.
+		console.log(maxContrast)
+
+		for (let i=0;i<processingArray.length;i++) {
+			//We will determine if the pixel in the image is of a color that would normally be removed.
+			//If the pixel is NOT the background color, it remains 0
+			//If the pixel is close to background color, set to 1.
+
+			let position = i*4
+			let r = pixelData[position]
+			let g = pixelData[position + 1]
+			let b = pixelData[position + 2]
+			//We don't care about transparency. It probably doesn't even exist in these types of images anyways.
+
+			if (contrast(targetArr, [r,g,b]) <= maxContrast) {
+				processingArray[i] = 1
+			}
+		}
+
+		//Set every edge 1 as a 2 in processingArray. This means any outside borders must be cropped out prior to processing.
+
+		//Top row
+		let startIndex = 0
+		for (let i=0;i<canvas.width;i++) {
+			if (processingArray[startIndex + i] === 1) {
+				processingArray[startIndex + i] = 2
+			}
+		}
+
+		//Bottom row.
+		startIndex = canvas.height-1 * canvas.width
+		for (let i=0;i<canvas.width;i++) {
+			if (processingArray[startIndex + i] === 1) {
+				processingArray[startIndex + i] = 2
+			}
+		}
+
+		//Left column
+		startIndex = 0
+		for (let i=0;i<canvas.height;i++) {
+			if (processingArray[startIndex + i * canvas.width] === 1) {
+				processingArray[startIndex + i * canvas.width] = 2
+			}
+		}
+
+		//Right column
+		startIndex = canvas.width - 1
+		for (let i=0;i<canvas.height;i++) {
+			if (processingArray[startIndex + i * canvas.width] === 1) {
+				processingArray[startIndex + i * canvas.width] = 2
+			}
+		}
+
+		//Not sure the most effecient way to do this...
+		//Recurse through all 2s, setting adjacent and diagonal 1s to 2s.
+		//The very first function call is LIKELY (but not guaranteed, depending on the exact image) to be absolutely massive, and recurse the entire image.
+		//We will need to make sure to handle this carefully, to avoid blowing up call stack.
+		function processRootPixel(position) {
+			let offsets = [
+				-1 //Left
+				+1 //Right
+				-canvas.width, //Above
+				canvas.width, //Below
+				-canvas.width + 1, //Top right
+				canvas.width + 1, //Bottom right
+				-canvas.width - 1, //Top left
+				canvas.width - 1, //Bottom left
+			]
+
+			let positionsToProcess = []
+			offsets.forEach((offset) => {
+				let nextPos = position + offset
+				if (nextPos < 0 || nextPos >= processingArray.length) {return} //Invalid position, go to next offset.
+				if (processingArray[nextPos] !== 1) {return} //Either a 2, or a 0.
+				processingArray[nextPos] = 2
+				positionsToProcess.push(nextPos)
+			})
+
+			return positionsToProcess //Do not recurse, call stack will blow.
+		}
+
+		for (let i=0;i<processingArray.length;i++) {
+			if (processingArray[i] === 2) {
+				let nextPositions = processRootPixel(i)
+				while (nextPositions.length > 0) {
+					//While we have positions remaining, process the last one, and add the new positions into the array.
+					//Hopefully the array does not go OOM.
+					let additionalPositions = processRootPixel(nextPositions.pop())
+					additionalPositions.forEach((pos) => {
+						nextPositions.push(pos)
+					})
+				}
+			}
+		}
+
+
+
+		//Set all 2s to transparent.
+		for (let i=0;i<processingArray.length;i++) {
+			if (processingArray[i] === 2) {
+				pixelData[i*4 + 3] = 0
+			}
+		}
+
+		ctx.putImageData(imageData, 0, 0)
+
+		//Convert to an image so that more features are available.
+		/*canvas.toBlob(function(blob) {
+			let url = URL.createObjectURL(blob)
+			let img = document.createElement("img")
+			img.src = url
+			processed.appendChild(img)
+		}, "image/png")*/
+		processed.appendChild(canvas)
+	}
+}
+
+
+
+
+
+
+		function GetId(n){return document.getElementById(n)}
+
+		let imagelist = []
+
+
+
+		async function newfiles(files) {
+		    //If we got a list of files, iterate through the list recursively.
+		    if (files instanceof FileList) {
+		        for (var i=0;i<files.length;i++) {
+		            newfiles(files[i])
+		        }
+		    }
+		    else {
+		    //We now have a single file or image element. createcanvas handles those for us
+		    let result = await createcanvas(files)
+		    }
+		}
+
+		document.onpaste = function(event){
+		  var items = (event.clipboardData || event.originalEvent.clipboardData).items;
+		  console.log(JSON.stringify(items)); // will give you the mime types
+		  for (index in items) {
+		    var item = items[index];
+		    if (item.kind === 'file') {
+		      var blob = item.getAsFile();
+		      createcanvas(blob)
+		    }
+		  }
+		}
+
+		let createcanvas = async function(data) {
+		    //FileReader is supported in web workers, except in Internet Explorer, Safari, and Edge.
+
+		    let readfile = async function(file) {
+		        let reader = new FileReader()
+		        return new Promise(function(resolve, reject){
+		            reader.onload = function() {
+		                resolve(reader.result)
+		            };
+		            reader.readAsDataURL(file)
+		        })
+		    }
+
+
+		    if (data instanceof File) {
+		        data = await readfile(data) //DataURL
+		    }
+
+
+		    let img;
+		    if (data instanceof HTMLImageElement) {
+				//If passed an HTML image element, simply set img to the element. Done.
+		        img = data
+		    }
+		    else {
+				//Data was a DataURL. Create an image.
+		        img = new Image()
+		        img.src = data
+		        await new Promise(function(resolve, reject){
+		            img.addEventListener("load", resolve)
+		            img.addEventListener("error", reject)
+		        })
+		    }
+
+		    let canvas = document.createElement("canvas")
+		    canvas.width = img.naturalWidth
+		    canvas.height = img.naturalHeight
+
+		    canvas.getContext("2d").drawImage(img,0,0)
+
+			addCanvas(canvas)
+		    return canvas
+		}
+
+
+
+
+		//Handle input type selectors
+		GetId("computer").addEventListener("click", computerinput)
+		GetId("url").addEventListener("click", urlinput)
+
+		function urlinput() {
+		    let fd = GetId("computer")
+		    let url = GetId("url")
+		    fd.classList.remove("selected")
+		    url.classList.add("selected")
+		    GetId("filedrop").style.display = "none"
+		    GetId("urlselector").style.display = "block"
+		}
+
+		function computerinput() {
+		    let fd = GetId("computer")
+		    let url = GetId("url")
+		    fd.classList.add("selected")
+		    url.classList.remove("selected")
+		    GetId("filedrop").style.display = "block"
+		    GetId("urlselector").style.display = "none"
+		}
+
+
+
+		//File from URL
+		GetId("fileurl").addEventListener("keydown", function(){
+		    setTimeout(urlchanged, 50, this)
+		})
+
+		function urlchanged(elem) {
+		    let prev = GetId("urlpreview")
+		    let submit = GetId("submiturl")
+
+		    prev.src = GetId("fileurl").value
+
+		    prev.style.display = "block"
+		    submit.disabled = "disabled"
+		    //When the image successfully loads
+		    prev.addEventListener("load", function(){
+		        submit.removeAttribute("disabled")
+		        submit.innerHTML = "Add Image"
+		    })
+		    prev.addEventListener("error", function(){
+		        prev.style.display = "none"
+		        submit.innerHTML = "Error Loading"
+		    })
+		}
+
+		GetId("submiturl").addEventListener("click", submiturl)
+
+		function submiturl() {
+		    let img = GetId("urlpreview")
+		    newfiles(img)
+		    img.style.display = "none"
+		}
+
+
+		//Handle File Input Button
+		GetId("fileinput").addEventListener("change", function(){
+		    console.log("Ran")
+		    newfiles(this.files)
+		})
+
+
+		//File Drag and Drop
+		let droparea = GetId('filedrop')
+
+
+		;['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+		  droparea.addEventListener(eventName, preventDefaults, false)
+		})
+
+		function preventDefaults (e) {
+		  e.preventDefault()
+		  e.stopPropagation()
+		}
+
+		;['dragenter', 'dragover'].forEach(eventName => {
+		  droparea.addEventListener(eventName, highlight, false)
+		})
+
+		;['dragleave', 'drop'].forEach(eventName => {
+		  droparea.addEventListener(eventName, unhighlight, false)
+		})
+
+		function highlight(e) {
+		  droparea.classList.add('highlight')
+		}
+
+		function unhighlight(e) {
+		  droparea.classList.remove('highlight')
+		}
+
+		droparea.addEventListener('drop', imagedropped, false)
+
+		function imagedropped(e) {
+		  let dt = e.dataTransfer
+		  let files = dt.files
+
+		  newfiles(files)
+		}
+
+
+
+
+
+
+		</script>
+
+		<style>
+		body {
+		    margin:0;
+		}
+
+		#fileurl {
+		    width:90%;
+		    display:block;
+		    margin:auto;
+		}
+
+		#urlpreview {
+		    width:auto;
+		    height:auto;
+		    max-width:320px;
+		    max-height:250px;
+		    display:block;
+		    margin:auto;
+		    margin-top:10px;
+		    margin-bottom:10px;
+		}
+
+		#filedrop, #urlselector {
+		  border: 2px dashed #ccc;
+		  border-radius: 5px;
+		  padding: 10px;
+		  width: 320px;
+		  height:auto;
+		  max-height:400px;
+		  margin:auto;
+		  background-color:#eef;
+		  text-align:center;
+		}
+
+		#filedrop.highlight {
+		  border-color: purple;
+		}
+
+		#fileinputlabel {
+		  display: inline-block;
+		  padding: 10px;
+		  background: #ccc;
+		  cursor: pointer;
+		  border-radius: 5px;
+		  border: 1px solid #ccc;
+		}
+
+		#fileinputlabel:hover {
+		  background: #ddd;
+		}
+
+		#fileinput, #urlselector {
+		  display: none;
+		}
+
+		#url, #computer {
+		    padding:4px;
+		    margin:2px;
+		    border-radius:4px;
+		    background: #fdf;
+		    border:0;
+		}
+
+		#url:hover, #computer:hover {
+		   background-color: #faf;
+		}
+
+		#url.selected, #computer.selected {
+		   background-color:#f9f;
+		}
+
+		#inputselector {
+		    margin-left:calc(50% - 170px);
+		    background-color:#aff;
+		    display:inline-block;
+		    border-radius:4px;
+		    padding:2px;
+		}
+
+		#previews *, #processed * {
+			max-width: 50vw;
+		}
+
+		#previews {
+			display: inline-block;
+			float: left;
+			max-width: 50vw;
+		}
+
+		#processed {
+			display: inline-block;
+			float: right;
+			max-width: 50vw;
+		}
+
+		</style>
+
+
+	</body>
+</html>

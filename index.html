@@ -96,7 +96,6 @@ function process() {
 		}
 
 		//Set every edge 1 as a 2 in processingArray. This means any outside borders must be cropped out prior to processing.
-
 		//Top row
 		let startIndex = 0
 		for (let i=0;i<canvas.width;i++) {
@@ -106,7 +105,7 @@ function process() {
 		}
 
 		//Bottom row.
-		startIndex = canvas.height-1 * canvas.width
+		startIndex = (canvas.height-1) * canvas.width
 		for (let i=0;i<canvas.width;i++) {
 			if (processingArray[startIndex + i] === 1) {
 				processingArray[startIndex + i] = 2

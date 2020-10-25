@@ -5,11 +5,22 @@
 	<body>
 
 		<script src="index.js"></script>
+		<div id="inputContainer">
+<h1>Background Remover</h1>
+
+<p>Remove a mostly solid background until reaching a border. <br>Borders on the edge of your image must be cropped out. <br><br>
+
+Background color defaults to white<br>
+Contrast defaults to 1.5<br><br>
+
+See the code on <a href="https://github.com/ecc521/background-remover" target="blank">GitHub</a></p><br>
+
 		<input id="backgroundR" placeholder="Red value of background color (0-255)"><br>
 		<input id="backgroundG" placeholder="Green value of background color (0-255)"><br>
 		<input id="backgroundB" placeholder="Blue value of background color (0-255)"><br>
 		<input id="maxContrast" placeholder="Max color contrast for background. (1-21)"><br>
 		<button id="process" onclick="process()">Process Images</button>
+		</div>
 
 <br>
 
@@ -478,9 +489,13 @@ function process() {
 			float: right;
 			max-width: 50vw;
 		}
-			
+
 		input {
 			width: 300px;
+		}
+
+		#inputContainer {
+			text-align: center;
 		}
 
 		</style>

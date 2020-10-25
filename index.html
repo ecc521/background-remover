@@ -5,10 +5,10 @@
 	<body>
 
 		<script src="index.js"></script>
-		<input id="backgroundR" placeholder="Red value of background color (0-255)">
-		<input id="backgroundG" placeholder="Green value of background color (0-255)">
-		<input id="backgroundB" placeholder="Blue value of background color (0-255)">
-		<input id="maxContrast" placeholder="Max color contrast for background. (1-22)">
+		<input id="backgroundR" placeholder="Red value of background color (0-255)"><br>
+		<input id="backgroundG" placeholder="Green value of background color (0-255)"><br>
+		<input id="backgroundB" placeholder="Blue value of background color (0-255)"><br>
+		<input id="maxContrast" placeholder="Max color contrast for background. (1-21)"><br>
 		<button id="process" onclick="process()">Process Images</button>
 
 <br>
@@ -477,6 +477,10 @@ function process() {
 			display: inline-block;
 			float: right;
 			max-width: 50vw;
+		}
+			
+		input {
+			width: 300px;
 		}
 
 		</style>
